@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import yaml
-from huggingface_hub import HfApi
+from huggingface_hub import HfApi, hf_hub_download
 
 HF_PATH_DATASET = "nRuaif-reseach-lab/Danbooru-2026"
 REMOTE_DATA_DIRS = ("data", "data_1", "data_2", "data_3", "data_4", "data_6", "data_9")
@@ -89,3 +89,24 @@ class DanbooruProcessor:
                 continue
 
             yield shard_path
+
+    def _ensure_prefetch(self, current_shard_path):
+        shards = self._remote_shard_ids()
+        current_index = shards.index(current_shard_path)
+
+        for shard_path in shards[current_index : current_index + self.prefetch_shards]:
+            self._download_shard(shard_path)
+
+    def _download_shard(self, shard_path):
+        local_path = self.cache_dir / shard_path
+        if local_path.exists():
+            return local_path
+
+        print(f"downloading {shard_path}")
+        hf_hub_download(
+            repo_id=self.repo_id,
+            repo_type="dataset",
+            filename=shard_path,
+            local_dir=self.cache_dir,
+        )
+        return local_path
