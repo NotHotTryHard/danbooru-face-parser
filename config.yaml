@@ -1,0 +1,16 @@
+dataset:
+  hf_path: /path_to_hf
+  path: /path_to_tmp_storage
+  prefetch_shards: 4
+  workers: 4
+  batch_size: 32
+
+output:
+  path: ./output
+  format:
+    height: 256
+    width: 256
+    pad: none # none | edge | white | black | transparent
+
+    format: webp # png | jpg | webp
+    quality: 95
