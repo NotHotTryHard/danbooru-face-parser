@@ -1,11 +1,14 @@
-dataset:
-  path: /path_to_tmp_storage
+paths:
+  cache: ./data
+  output: ./output
+  progress: ./data/.progress.yaml
+  manifest: ./data/.shards.txt
+
+processing:
   prefetch_shards: 4
-  workers: 4
-  batch_size: 32
+  delete_completed_shards: true
 
 output:
-  path: ./output
   image:
     height: 256
     width: 256
@@ -23,5 +26,4 @@ face_detection:
 
 resume:
   enabled: false
-  data_dir: data # data | data_1 | data_2 | data_3 | data_4 | data_6 | data_9
-  last_shard: shard-000001.tar
+  last_completed_shard: data_1/shard-000045.tar
