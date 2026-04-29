@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import yaml
+from huggingface_hub import HfApi
 
 HF_PATH_DATASET = "nRuaif-reseach-lab/Danbooru-2026"
 REMOTE_DATA_DIRS = ("data", "data_1", "data_2", "data_3", "data_4", "data_6", "data_9")
@@ -36,10 +37,9 @@ class DanbooruProcessor:
         self.delete_shards = bool(processing_cfg.get("delete_completed_shards", True))
 
         self.resume_enabled = bool(resume_cfg.get("enabled", True))
-        self.last_completed_shard = self._clean_shard_id(
-            self._load_progress().get("last_completed_shard")
-            or resume_cfg.get("last_completed_shard")
-        )
+        self.last_completed_shard = self._load_progress().get(
+            "last_completed_shard"
+        ) or resume_cfg.get("last_completed_shard")
 
         self.include_tags = set(filter_cfg.get("include_tags") or [])
         self.exclude_tags = set(filter_cfg.get("exclude_tags") or [])
@@ -51,17 +51,6 @@ class DanbooruProcessor:
         with Path(path).open("r", encoding="utf-8") as file:
             return yaml.safe_load(file) or {}
 
-    @staticmethod
-    def _clean_shard_id(shard_id):
-        if not shard_id:
-            return None
-
-        shard_id = Path(str(shard_id)).as_posix().strip("/")
-        if shard_id.endswith(".tar"):
-            shard_id = shard_id[:-4]
-
-        return shard_id
-
     def _load_progress(self):
         if not self.resume_enabled or not self.progress_path.exists():
             return {}
@@ -69,7 +58,34 @@ class DanbooruProcessor:
         with self.progress_path.open("r", encoding="utf-8") as file:
             return yaml.safe_load(file) or {}
 
-    def _save_progress(self, shard_id):
+    def _save_progress(self, shard_path):
         self.progress_path.parent.mkdir(parents=True, exist_ok=True)
         with self.progress_path.open("w", encoding="utf-8") as file:
-            yaml.safe_dump({"last_completed_shard": shard_id}, file, sort_keys=False)
+            yaml.safe_dump({"last_completed_shard": shard_path}, file, sort_keys=False)
+
+    def _remote_shard_ids(self):
+        if self._remote_shards is None:
+            if self.manifest_path.exists():
+                files = self.manifest_path.read_text(encoding="utf-8").splitlines()
+                files = [file.strip() for file in files if file.strip()]
+            else:
+                files = HfApi().list_repo_files(self.repo_id, repo_type="dataset")
+                files = [file for file in files if file.endswith(".tar")]
+                self.manifest_path.write_text(
+                    "\n".join(sorted(files)) + "\n", encoding="utf-8"
+                )
+
+            self._remote_shards = sorted(files)
+
+        return self._remote_shards
+
+    def _pending_shards(self):
+        for shard_path in self._remote_shard_ids():
+            if (
+                self.resume_enabled
+                and self.last_completed_shard
+                and shard_path <= self.last_completed_shard
+            ):
+                continue
+
+            yield shard_path
