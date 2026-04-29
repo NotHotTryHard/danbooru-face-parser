@@ -6,5 +6,8 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "huggingface-hub>=1.12.2",
-    "torch>=2.11.0",
+    "pyyaml>=6.0.3",
 ]
+
+[project.scripts]
+danbooru-face-parser = "processor:main"
