@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import yaml
-from torch.utils.data import DataLoader, IterableDataset
+from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 
 
 class DanbooruDataset(IterableDataset):
@@ -23,6 +23,12 @@ class DanbooruDataset(IterableDataset):
         self.include_tags = set(filter_cfg.get("include_tags") or [])
         self.exclude_tags = set(filter_cfg.get("exclude_tags") or [])
 
+    def __iter__(self):
+        shards = self._split_between_workers(self._shards())
+
+        for shard_id, shard_path in shards:
+            yield None
+
     @staticmethod
     def _load_yaml(path):
         with Path(path).open("r", encoding="utf-8") as file:
@@ -38,3 +44,21 @@ class DanbooruDataset(IterableDataset):
             shard_id = shard_id[:-4]
 
         return shard_id
+
+    def _shards(self):
+        shards = sorted(self._find_shards())
+
+        if not self.resume_enabled or self.last_shard is None:
+            return shards
+
+        return [(name, path) for name, path in shards if name > self.last_shard]
+
+    def _find_shards(self):
+        for data_dir in self.data_dirs:
+            base = self.root / data_dir
+            if not base.exists():
+                continue
+
+            for shard_path in base.glob("shard-*"):
+                if shard_path.is_file():
+                    yield f"{data_dir}/{shard_path.name}", shard_path
