@@ -1,5 +1,4 @@
 dataset:
-  hf_path: /path_to_hf
   path: /path_to_tmp_storage
   prefetch_shards: 4
   workers: 4
@@ -7,10 +6,22 @@ dataset:
 
 output:
   path: ./output
-  format:
+  image:
     height: 256
     width: 256
     pad: none # none | edge | white | black | transparent
-
     format: webp # png | jpg | webp
     quality: 95
+
+filter:
+  include_tags: []
+  exclude_tags: []
+
+face_detection:
+  device: auto # auto | cpu | cuda | mps
+  confidence_threshold: 0.8
+
+resume:
+  enabled: false
+  data_dir: data # data | data_1 | data_2 | data_3 | data_4 | data_6 | data_9
+  last_shard: shard-000001.tar
