@@ -1,3 +1,5 @@
+import json
+import tarfile
 from pathlib import Path
 
 import yaml
@@ -110,3 +112,85 @@ class DanbooruProcessor:
             local_dir=self.cache_dir,
         )
         return local_path
+
+    def _mark_completed(self, shard_path):
+        self.last_completed_shard = shard_path
+        if self.resume_enabled:
+            self._save_progress(shard_path)
+
+    def _process_shard(self, shard_path, local_path):
+        kept = 0
+        skipped = 0
+
+        with tarfile.open(local_path, "r") as tar:
+            samples = self._index_tar_members(tar)
+
+            for key in sorted(samples):
+                files = samples[key]
+                image = files["image"]
+                meta_json = files[".json"]
+
+                metadata = self._read_json_member(tar, meta_json)
+                if not self._sample_allowed(metadata):
+                    skipped += 1
+                    continue
+
+                self._write_sample(shard_path, key, image, metadata, tar)
+                kept += 1
+
+        return kept, skipped
+
+    @staticmethod
+    def _index_tar_members(tar):
+        samples = {}
+
+        for member in tar.getmembers():
+            if not member.isfile():
+                continue
+
+            path = Path(member.name)
+            suffix = path.suffix.lower()
+            key = path.with_suffix("").as_posix()
+            sample = samples.setdefault(key, {})
+
+            if suffix == ".webp":
+                sample["image"] = member
+            elif suffix == ".json":
+                sample["meta"] = member
+
+        return samples
+
+    def _write_sample(self, shard_path, key, image_member, metadata, tar):
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        shard_name = shard_path.removesuffix(".tar").replace("/", "_")
+        output_name = f"{shard_name}_{Path(key).name}"
+        image_path = self.output_dir / f"{output_name}.webp"
+        json_path = self.output_dir / f"{output_name}.json"
+
+        image = tar.extractfile(image_member)
+        if image is None:
+            return
+
+        image_path.write_bytes(image.read())
+        json_path.write_text(
+            json.dumps(metadata, ensure_ascii=False, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+
+    def _read_json_member(self, tar, member):
+        file = tar.extractfile(member)
+        if file is None:
+            return {}
+
+        return json.loads(file.read().decode("utf-8"))
+
+    def _sample_allowed(self, metadata):
+        if not self.include_tags and not self.exclude_tags:
+            return True
+
+        tags = set((metadata.get("tag_string") or "").split())
+
+        if self.include_tags and not self.include_tags.issubset(tags):
+            return False
+
+        return tags.isdisjoint(self.exclude_tags)
