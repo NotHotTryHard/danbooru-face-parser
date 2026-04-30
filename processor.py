@@ -141,8 +141,11 @@ class DanbooruProcessor:
 
             for key in sorted(samples):
                 files = samples[key]
-                image = files["image"]
-                meta_json = files[".json"]
+                image = files.get("image")
+                meta_json = files.get("json")
+                if image is None or meta_json is None:
+                    skipped += 1
+                    continue
 
                 metadata = self._read_json_member(tar, meta_json)
                 if not self._sample_allowed(metadata):
@@ -170,7 +173,7 @@ class DanbooruProcessor:
             if suffix == ".webp":
                 sample["image"] = member
             elif suffix == ".json":
-                sample["meta"] = member
+                sample["json"] = member
 
         return samples
 
