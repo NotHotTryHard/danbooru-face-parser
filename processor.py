@@ -1,3 +1,4 @@
+import argparse
 import json
 import tarfile
 from pathlib import Path
@@ -47,6 +48,19 @@ class DanbooruProcessor:
         self.exclude_tags = set(filter_cfg.get("exclude_tags") or [])
 
         self._remote_shards = None
+
+    def run(self):
+        for shard_path in self._pending_shards():
+            self._ensure_prefetch(shard_path)
+            local_path = self.cache_dir / shard_path
+
+            kept, skipped = self._process_shard(shard_path, local_path)
+            self._mark_completed(shard_path)
+
+            if self.delete_shards:
+                local_path.unlink(missing_ok=True)
+
+            print(f"completed {shard_path}: kept={kept}, skipped={skipped}")
 
     @staticmethod
     def _load_yaml(path):
@@ -194,3 +208,15 @@ class DanbooruProcessor:
             return False
 
         return tags.isdisjoint(self.exclude_tags)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", default="config.yaml")
+    args = parser.parse_args()
+
+    DanbooruProcessor(args.config).run()
+
+
+if __name__ == "__main__":
+    main()
