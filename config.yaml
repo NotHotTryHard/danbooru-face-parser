@@ -1,29 +1,29 @@
+dataset:
+  repo_id: deepghs/danbooru2024-webp-4Mpixel
+
 paths:
   cache: ./data
   output: ./output
-  progress: ./data/.progress.yaml
-  manifest: ./data/.shards.txt
 
-processing:
-  prefetch_shards: 4
-  delete_completed_shards: true
+filter:
+  include_tags: [ahegao]
+  exclude_tags: []
+  limit: 0 # 0 = no limit
+
+download:
+  max_workers: 8
+  keep_originals: true
+
+face_detection:
+  level: s # n = faster, s = more accurate
+  confidence_threshold: 0.8
+  bbox_scale: 1.2 # expand the detected face box before cropping
 
 output:
   image:
-    height: 256
     width: 256
+    height: 256
     pad: none # none | edge | white | black | transparent
-    format: webp # png | jpg | webp
+    format: webp # webp | jpg | png
     quality: 95
-
-filter:
-  include_tags: []
-  exclude_tags: []
-
-face_detection:
-  device: auto # auto | cpu | cuda | mps
-  confidence_threshold: 0.8
-
-resume:
-  enabled: false
-  last_completed_shard: data_1/shard-000045.tar
+  save_metadata: true
